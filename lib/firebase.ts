@@ -15,6 +15,6 @@ const firebaseConfig = {
 // Initialize Firebase only if there are no instantiated apps
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-const db = getFirestore(app, process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID); // Using the specific Named instance ID
+const db = getFirestore(app, process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID as string); // Using the specific Named instance ID
 
 export { app, auth, db };

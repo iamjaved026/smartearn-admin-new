@@ -30,7 +30,6 @@ interface UIContextType {
   markAllAsRead: () => void;
   clearNotifications: () => void;
   unreadCount: number;
-  unreadCount: number;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
