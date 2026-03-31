@@ -1,33 +1,55 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DataTable from '@/components/DataTable';
-import { withdrawRequests as initialRequests, usersData } from '@/lib/mock-data';
-import { Check, X, Info, Send } from 'lucide-react';
+import { Check, X, Info, Send, Loader2 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { useRouter } from 'next/navigation';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { processWithdrawalAction } from '@/lib/firebase-transactions';
 
 export default function WithdrawRequestsPage() {
-  const [requests, setRequests] = useState(initialRequests);
-  const { showToast, addNotification } = useUI();
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { showToast } = useUI();
   const router = useRouter();
 
-  const handleAction = (id: number, status: 'Approved' | 'Rejected') => {
-    const request = requests.find(r => r.id === id);
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-    showToast(`Request ${status} successfully`, status === 'Approved' ? 'success' : 'error');
-
-    if (status === 'Approved' && request) {
-      const userObj = usersData.find(u => u.name === request.user);
-      const userId = userObj?.id || '1';
-      
-      addNotification({
-        title: 'Withdrawal Processed',
-        message: `Withdrawal of ₹${request.amount} for ${request.user} has been approved.`,
-        type: 'info',
-        actionLabel: 'Send Message',
-        actionLink: `/users/${userId}`
+  useEffect(() => {
+    // We order by date descending to show newest withdrawals first
+    const q = query(collection(db, 'withdrawals'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data: any[] = [];
+      snapshot.forEach((doc) => {
+        const item = doc.data();
+        data.push({
+          id: doc.id,
+          userUid: item.uid,
+          amount: item.amount || 0,
+          upi: item.details || item.method || 'N/A',
+          status: item.status === 'completed' ? 'Approved' : item.status === 'failed' ? 'Rejected' : 'Pending',
+          date: item.date ? new Date(item.date).toLocaleDateString() : 'Unknown',
+          transactionId: item.transactionId,
+        });
       });
+      setRequests(data);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching withdrawals:", error);
+      showToast('Error loading withdrawal requests', 'error');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [showToast]);
+
+  const handleAction = async (id: string, transactionId: string, status: 'Approved' | 'Rejected') => {
+    try {
+      await processWithdrawalAction(id, transactionId, status);
+      showToast(`Request ${status} successfully`, status === 'Approved' ? 'success' : 'error');
+    } catch (error) {
+      console.error(error);
+      showToast(`Failed to update request`, 'error');
     }
   };
 
@@ -38,83 +60,74 @@ export default function WithdrawRequestsPage() {
         <p className="text-slate-500">Manage and process user withdrawal requests.</p>
       </div>
 
-      <DataTable
-        data={requests}
-        compact={true}
-        onRowClick={(item) => router.push(`/withdraw-requests/${item.id}`)}
-        columns={[
-          { header: 'User', accessor: 'user', className: 'font-medium text-slate-900' },
-          { header: 'Amount', accessor: (item) => (
-            <span className="font-bold text-slate-900">₹{item.amount}</span>
-          )},
-          { header: 'UPI ID', accessor: 'upi', className: 'font-mono text-xs' },
-          { header: 'Status', accessor: (item) => (
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              item.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' :
-              item.status === 'Pending' ? 'bg-amber-50 text-amber-600' :
-              'bg-rose-50 text-rose-600'
-            }`}>
-              {item.status}
-            </span>
-          )},
-          { header: 'Date', accessor: 'date' },
-          { header: 'Actions', accessor: (item) => {
-            const userObj = usersData.find(u => u.name === item.user);
-            const userId = userObj?.id || '1';
-            
-            return (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push(`/withdraw-requests/${item.id}`);
-                  }}
-                  title="View Details" 
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                >
-                  <Info size={14} />
-                </button>
-                {item.status === 'Approved' && (
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      ) : (
+        <DataTable
+          data={requests}
+          compact={true}
+          onRowClick={(item) => router.push(`/withdraw-requests/${item.id}`)}
+          columns={[
+            { header: 'User UID', accessor: 'userUid', className: 'font-medium text-slate-900 text-xs' },
+            { header: 'Amount', accessor: (item) => (
+              <span className="font-bold text-slate-900">₹{item.amount}</span>
+            )},
+            { header: 'Details', accessor: 'upi', className: 'font-mono text-xs' },
+            { header: 'Status', accessor: (item) => (
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                item.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' :
+                item.status === 'Pending' ? 'bg-amber-50 text-amber-600' :
+                'bg-rose-50 text-rose-600'
+              }`}>
+                {item.status}
+              </span>
+            )},
+            { header: 'Date', accessor: 'date' },
+            { header: 'Actions', accessor: (item) => {
+              return (
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/users/${userId}`);
+                      router.push(`/withdraw-requests/${item.id}`);
                     }}
-                    title="Send Message" 
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                    title="View Details" 
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                   >
-                    <Send size={14} />
+                    <Info size={14} />
                   </button>
-                )}
-                {item.status === 'Pending' && (
-                  <>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(item.id, 'Approved');
-                      }}
-                      title="Approve" 
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(item.id, 'Rejected');
-                      }}
-                      title="Reject" 
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          }},
-        ]}
-      />
+                  {item.status === 'Pending' && (
+                    <>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction(item.id, item.transactionId, 'Approved');
+                        }}
+                        title="Approve" 
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction(item.id, item.transactionId, 'Rejected');
+                        }}
+                        title="Reject" 
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }},
+          ]}
+        />
+      )}
     </div>
   );
 }

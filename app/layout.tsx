@@ -11,10 +11,10 @@ import { usePathname } from 'next/navigation';
 const inter = Inter({ subsets: ['latin'] });
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const pathname = usePathname();
 
-  if (!isAuthenticated || pathname === '/login') {
+  if (!user || pathname === '/login') {
     return <>{children}</>;
   }
 

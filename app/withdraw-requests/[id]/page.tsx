@@ -2,24 +2,70 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { withdrawRequests, usersData } from '@/lib/mock-data';
-import { ArrowLeft, Wallet, User, Calendar, Hash, CheckCircle2, XCircle, Clock, Send } from 'lucide-react';
+import { ArrowLeft, Wallet, User, Calendar, Hash, CheckCircle2, XCircle, Clock, Send, Loader2 } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
+import { processWithdrawalAction } from '@/lib/firebase-transactions';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function WithdrawalDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { showToast, addNotification } = useUI();
+  const { showToast } = useUI();
   
-  // Find request directly during render for static mock data
-  const initialRequest = withdrawRequests.find(r => r.id.toString() === params.id);
-  const [request, setRequest] = useState<any>(initialRequest);
+  const [request, setRequest] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
-  // Find the user ID for messaging
-  const userObj = usersData.find(u => u.name === request?.user);
-  const userId = userObj?.id || '1';
+  useEffect(() => {
+    if (!params.id) return;
+    const unsub = onSnapshot(doc(db, 'withdrawals', params.id as string), (docSnap) => {
+      if (docSnap.exists()) {
+        const item = docSnap.data();
+        setRequest({
+           id: docSnap.id,
+           user: item.uid || 'Unknown User UID',
+           amount: item.amount || 0,
+           upi: item.details || item.method || 'N/A',
+           status: item.status === 'completed' ? 'Approved' : item.status === 'failed' ? 'Rejected' : 'Pending',
+           date: item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
+           transactionId: item.transactionId
+        });
+      } else {
+        setRequest(null);
+      }
+      setLoading(false);
+    }, (error) => {
+       console.error(error);
+       showToast("Failed to load request", "error");
+       setLoading(false);
+    });
 
-  if (!request) {
+    return () => unsub();
+  }, [params.id, showToast]);
+
+  const handleAction = async (status: 'Approved' | 'Rejected') => {
+    setProcessing(true);
+    try {
+      await processWithdrawalAction(request.id, request.transactionId, status);
+      showToast(`Request ${status} successfully`, status === 'Approved' ? 'success' : 'error');
+    } catch (e) {
+      console.error(e);
+      showToast('Action failed', 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (loading) {
+     return (
+        <div className="flex h-[60vh] items-center justify-center">
+           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+     )
+  }
+
+  if (!request && !loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="text-center">
@@ -34,21 +80,6 @@ export default function WithdrawalDetailPage() {
       </div>
     );
   }
-
-  const handleAction = (status: 'Approved' | 'Rejected') => {
-    setRequest((prev: any) => ({ ...prev, status }));
-    showToast(`Request ${status} successfully`, status === 'Approved' ? 'success' : 'error');
-    
-    if (status === 'Approved') {
-      addNotification({
-        title: 'Withdrawal Processed',
-        message: `Withdrawal of ₹${request.amount} for ${request.user} has been approved.`,
-        type: 'info',
-        actionLabel: 'Send Message',
-        actionLink: `/users/${userId}`
-      });
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -65,7 +96,17 @@ export default function WithdrawalDetailPage() {
           <CheckCircle2 size={24} className="text-emerald-500" />
           <div>
             <p className="font-bold">Withdrawal Approved!</p>
-            <p className="text-sm">The withdrawal request has been successfully processed and approved.</p>
+            <p className="text-sm">The withdrawal request has been successfully processed in Firebase.</p>
+          </div>
+        </div>
+      )}
+
+      {request.status === 'Rejected' && (
+        <div className="max-w-3xl mx-auto rounded-2xl bg-rose-50 border border-rose-100 p-4 flex items-center gap-3 text-rose-700 animate-in fade-in slide-in-from-top-4 duration-500">
+          <XCircle size={24} className="text-rose-500" />
+          <div>
+            <p className="font-bold">Withdrawal Rejected</p>
+            <p className="text-sm">This withdrawal request was denied.</p>
           </div>
         </div>
       )}
@@ -80,7 +121,7 @@ export default function WithdrawalDetailPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold">Withdrawal Detail</h1>
-                  <p className="text-sm text-slate-400">Request ID: #{request.id}</p>
+                  <p className="text-sm text-slate-400">Request ID: #{request.id.substring(0,8)}</p>
                 </div>
               </div>
               <div className={`rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider ${
@@ -99,15 +140,15 @@ export default function WithdrawalDetailPage() {
                 <div className="flex items-start gap-4">
                   <div className="mt-1 text-slate-400"><User size={20} /></div>
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">User Name</p>
-                    <p className="text-lg font-semibold text-slate-900">{request.user}</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">User UID</p>
+                    <p className="text-sm font-semibold text-slate-900 break-all">{request.user}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start gap-4">
                   <div className="mt-1 text-slate-400"><Hash size={20} /></div>
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">UPI ID / Payment Address</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">UPI ID / Payment Details</p>
                     <p className="text-lg font-mono font-bold text-indigo-600">{request.upi}</p>
                   </div>
                 </div>
@@ -136,17 +177,19 @@ export default function WithdrawalDetailPage() {
               {request.status === 'Pending' ? (
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button 
+                    disabled={processing}
                     onClick={() => handleAction('Approved')}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-70"
                   >
-                    <CheckCircle2 size={20} />
+                    {processing ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
                     Approve Request
                   </button>
                   <button 
+                    disabled={processing}
                     onClick={() => handleAction('Rejected')}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-rose-600 py-4 text-sm font-bold text-white shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-rose-600 py-4 text-sm font-bold text-white shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all disabled:opacity-70"
                   >
-                    <XCircle size={20} />
+                    {processing ? <Loader2 size={20} className="animate-spin" /> : <XCircle size={20} />}
                     Reject Request
                   </button>
                 </div>
@@ -154,17 +197,15 @@ export default function WithdrawalDetailPage() {
                 <div className="rounded-2xl bg-slate-50 p-6 flex flex-col sm:flex-row items-center justify-center gap-4 text-slate-500">
                   <div className="flex items-center gap-3">
                     <Clock size={20} />
-                    <p className="text-sm font-medium">This request was processed on {request.date}</p>
+                    <p className="text-sm font-medium">This request was processed to status: {request.status}</p>
                   </div>
-                  {request.status === 'Approved' && (
-                    <button 
-                      onClick={() => router.push(`/users/${userId}`)}
-                      className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                    >
-                      <Send size={16} />
-                      Send Message
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => router.push(`/users/${request.user}`)}
+                    className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                  >
+                    <User size={16} />
+                    Go to User Profile
+                  </button>
                 </div>
               )}
             </div>

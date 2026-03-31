@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import Toast, { ToastType } from '@/components/Toast';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export interface Notification {
   id: string;
@@ -15,13 +17,7 @@ export interface Notification {
   actionLink?: string;
 }
 
-export interface Admin {
-  id: string;
-  email: string;
-  password?: string;
-  role: 'Admin' | 'Super Admin';
-  name: string;
-}
+
 
 interface UIContextType {
   isSidebarOpen: boolean;
@@ -34,14 +30,7 @@ interface UIContextType {
   markAllAsRead: () => void;
   clearNotifications: () => void;
   unreadCount: number;
-  admins: Admin[];
-  addAdmin: (admin: Omit<Admin, 'id'>) => void;
-  currentUser: Admin | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
-  isLogoutModalOpen: boolean;
-  setLogoutModalOpen: (open: boolean) => void;
-  confirmLogout: () => void;
+  unreadCount: number;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -49,43 +38,6 @@ const UIContext = createContext<UIContextType | undefined>(undefined);
 export function UIProvider({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
-  const [isLogoutModalOpen, setLogoutModalOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<Admin | null>(() => {
-    if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('smart_earn_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    }
-    return null;
-  });
-  
-  const [admins, setAdmins] = useState<Admin[]>(() => {
-    if (typeof window !== 'undefined') {
-      const initialAdmins: Admin[] = [
-        { id: '1', email: 'admin@smartearn.com', password: 'admin123', role: 'Super Admin', name: 'Super Admin' },
-        { id: '2', email: 'jvdhussain09@gmail.com', password: 'admin123', role: 'Super Admin', name: 'Owner' }
-      ];
-
-      const savedAdmins = localStorage.getItem('smart_earn_admins');
-      if (savedAdmins) {
-        const parsed = JSON.parse(savedAdmins);
-        // Merge initial admins if they don't exist in saved ones
-        const merged = [...parsed];
-        initialAdmins.forEach(initial => {
-          if (!merged.find(a => a.email === initial.email)) {
-            merged.push(initial);
-          }
-        });
-        if (merged.length !== parsed.length) {
-          localStorage.setItem('smart_earn_admins', JSON.stringify(merged));
-        }
-        return merged;
-      }
-      
-      localStorage.setItem('smart_earn_admins', JSON.stringify(initialAdmins));
-      return initialAdmins;
-    }
-    return [];
-  });
   
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -133,36 +85,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     showToast('All notifications cleared');
   };
 
-  const addAdmin = (admin: Omit<Admin, 'id'>) => {
-    const newAdmin = { ...admin, id: Math.random().toString(36).substr(2, 9) };
-    const updatedAdmins = [...admins, newAdmin];
-    setAdmins(updatedAdmins);
-    localStorage.setItem('smart_earn_admins', JSON.stringify(updatedAdmins));
-    showToast('New admin added successfully');
-  };
-
-  const login = (email: string, password: string): boolean => {
-    const admin = admins.find(a => a.email === email && a.password === password);
-    if (admin) {
-      setCurrentUser(admin);
-      localStorage.setItem('smart_earn_user', JSON.stringify(admin));
-      showToast(`Welcome back, ${admin.name}!`);
-      return true;
-    }
-    return false;
-  };
-
-  const logout = () => {
-    setLogoutModalOpen(true);
-  };
-
-  const confirmLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('smart_earn_user');
-    setLogoutModalOpen(false);
-    window.location.href = '/login';
-  };
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -176,15 +98,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       markAsRead,
       markAllAsRead,
       clearNotifications,
-      unreadCount,
-      admins,
-      addAdmin,
-      currentUser,
-      login,
-      logout,
-      isLogoutModalOpen,
-      setLogoutModalOpen,
-      confirmLogout
+      unreadCount
     }}>
       {children}
       {toast && (

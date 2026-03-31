@@ -52,7 +52,7 @@ export default function Sidebar() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
                 <TrendingUp size={24} />
               </div>
-              <span className="text-xl font-bold tracking-tight text-slate-900">Smart Earn</span>
+              <span className="text-xl font-bold tracking-tight text-slate-900">SmartEarn Admin</span>
             </div>
             <button 
               onClick={closeSidebar}
