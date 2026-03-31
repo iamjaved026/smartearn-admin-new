@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUI } from '@/context/UIContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
@@ -30,7 +32,17 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isSidebarOpen, closeSidebar, logout } = useUI();
+  const { isSidebarOpen, closeSidebar } = useUI();
+
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.error("Logout failed:", e);
+      }
+    }
+  };
 
   return (
     <>
@@ -89,8 +101,8 @@ export default function Sidebar() {
 
           <div className="mt-auto border-t border-slate-100 pt-4">
             <button 
-              onClick={logout}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-red-50 hover:text-red-600"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-red-50 hover:text-red-600 group"
             >
               <LogOut size={20} className="text-slate-400 group-hover:text-red-600" />
               Logout
