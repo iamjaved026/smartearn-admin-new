@@ -60,12 +60,8 @@ export default function WithdrawRequestsPage() {
         <p className="text-slate-500">Manage and process user withdrawal requests.</p>
       </div>
 
-      {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        </div>
-      ) : (
-        <DataTable
+      <DataTable
+          isLoading={loading}
           data={requests}
           compact={true}
           onRowClick={(item) => router.push(`/withdraw-requests/${item.id}`)}
@@ -127,7 +123,6 @@ export default function WithdrawRequestsPage() {
             }},
           ]}
         />
-      )}
     </div>
   );
 }

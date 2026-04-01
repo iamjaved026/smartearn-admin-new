@@ -7,6 +7,7 @@ import { useUI } from '@/context/UIContext';
 import FormInput from '@/components/FormInput';
 import { doc, onSnapshot, updateDoc, increment, arrayUnion, writeBatch, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { SkeletonBlock } from '@/components/Skeleton';
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -17,7 +18,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   
   // Coin Adjustments
-  const [coinsToAdjust, setCoinsToAdjust] = useState<number>(0);
+  const [coinsToAdjust, setCoinsToAdjust] = useState<number | ''>('');
   const [adjusting, setAdjusting] = useState(false);
   
   // Messaging
@@ -98,7 +99,7 @@ export default function UserDetailPage() {
   };
 
   const handleAdjustCoins = async (type: 'add' | 'subtract') => {
-    if (coinsToAdjust <= 0) {
+    if (coinsToAdjust === '' || coinsToAdjust <= 0) {
       showToast('Please enter a valid amount', 'error');
       return;
     }
@@ -121,7 +122,7 @@ export default function UserDetailPage() {
       
       await batch.commit();
       showToast(`${type === 'add' ? 'Added' : 'Subtracted'} ${coinsToAdjust} coins`, 'success');
-      setCoinsToAdjust(0);
+      setCoinsToAdjust('');
       setTotalTransactions(prev => prev + 1);
     } catch (e) {
       console.error(e);
@@ -183,9 +184,16 @@ export default function UserDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
+       <div className="space-y-6 animate-in fade-in pb-12">
+          <div className="h-8 w-64 bg-slate-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+             <SkeletonBlock />
+             <div className="lg:col-span-2 space-y-6">
+               <SkeletonBlock />
+               <SkeletonBlock />
+             </div>
+          </div>
+       </div>
     );
   }
 
@@ -319,7 +327,7 @@ export default function UserDetailPage() {
                    label="Amount to inject / deduct"
                    type="number"
                    value={coinsToAdjust}
-                   onChange={(e) => setCoinsToAdjust(parseInt(e.target.value) || 0)}
+                   onChange={(e) => setCoinsToAdjust(e.target.value === '' ? '' : parseInt(e.target.value))}
                    placeholder="Enter explicit coin amount..."
                    helperText="Values altered here will reflect permanently on the user's ledger."
                  />

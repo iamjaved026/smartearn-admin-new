@@ -25,6 +25,7 @@ interface DataTableProps<T> {
   selectedId?: string | number;
   compact?: boolean;
   pagination?: PaginationProps;
+  isLoading?: boolean;
 }
 
 export default function DataTable<T extends { id: string | number }>({ 
@@ -35,10 +36,11 @@ export default function DataTable<T extends { id: string | number }>({
   onRowClick,
   selectedId,
   compact = false,
-  pagination
+  pagination,
+  isLoading = false
 }: DataTableProps<T>) {
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col", className)}>
+    <div className={cn("overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col min-w-0 w-full", className)}>
       {title && (
         <div className="border-b border-slate-100 px-6 py-4">
           <h3 className="font-semibold text-slate-900">{title}</h3>
@@ -49,14 +51,24 @@ export default function DataTable<T extends { id: string | number }>({
           <thead className="bg-slate-50 text-xs font-medium uppercase tracking-wider text-slate-500">
             <tr>
               {columns.map((column, idx) => (
-                <th key={idx} className={cn(compact ? "px-4 py-3" : "px-6 py-4", column.className)}>
+                <th key={idx} className={cn("whitespace-nowrap", compact ? "px-4 py-3" : "px-6 py-4", column.className)}>
                   {column.header}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data.length === 0 ? (
+            {isLoading ? (
+               Array.from({ length: 5 }).map((_, idx) => (
+                 <tr key={`skeleton-${idx}`}>
+                   {columns.map((_, i) => (
+                      <td key={i} className={cn("whitespace-nowrap", compact ? "px-4 py-3" : "px-6 py-4")}>
+                         <div className="h-4 w-full animate-pulse rounded-lg bg-slate-100"></div>
+                      </td>
+                   ))}
+                 </tr>
+               ))
+            ) : data.length === 0 ? (
                <tr>
                  <td colSpan={columns.length} className="px-6 py-8 text-center text-slate-500">
                     No records found.
@@ -76,6 +88,7 @@ export default function DataTable<T extends { id: string | number }>({
                       <td 
                         key={idx} 
                         className={cn(
+                          "whitespace-nowrap",
                           compact ? "px-4 py-3" : "px-6 py-4", 
                           "text-slate-600", 
                           column.className,

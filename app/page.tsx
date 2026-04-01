@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import DataTable from '@/components/DataTable';
+import { SkeletonCard, SkeletonBlock } from '@/components/Skeleton';
 import { useUI } from '@/context/UIContext';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -174,16 +175,20 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, idx) => (
-          <StatCard
-            key={idx}
-            title={stat.title}
-            value={stat.value}
-            icon={iconMap[stat.icon]}
-            trend={stat.trend}
-            color={stat.color as any}
-          />
-        ))}
+        {chartsLoading ? (
+           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+           stats.map((stat, idx) => (
+             <StatCard
+               key={idx}
+               title={stat.title}
+               value={stat.value}
+               icon={iconMap[stat.icon]}
+               trend={stat.trend}
+               color={stat.color as any}
+             />
+           ))
+        )}
       </div>
 
       {/* Live 7-Day Visual Charts */}
@@ -195,7 +200,7 @@ export default function DashboardPage() {
           </div>
           <div className="h-[200px] w-full">
             {chartsLoading ? (
-               <div className="h-full flex items-center justify-center text-indigo-600"><Loader2 className="animate-spin" /></div>
+               <div className="h-full flex items-center justify-center animate-pulse rounded-xl bg-slate-50"><Loader2 className="animate-spin text-slate-300" /></div>
             ) : (
                <ResponsiveContainer width="100%" height="100%">
                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -226,7 +231,7 @@ export default function DashboardPage() {
           </div>
           <div className="h-[200px] w-full">
              {chartsLoading ? (
-               <div className="h-full flex items-center justify-center text-emerald-600"><Loader2 className="animate-spin" /></div>
+               <div className="h-full flex items-center justify-center animate-pulse rounded-xl bg-slate-50"><Loader2 className="animate-spin text-slate-300" /></div>
              ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -250,6 +255,7 @@ export default function DashboardPage() {
         <DataTable
           title="Live Activity Stream (Transactions)"
           data={recentTransactions}
+          isLoading={chartsLoading}
           columns={[
             { header: 'UID Hash', accessor: 'uid', className: 'text-xs text-slate-400 font-mono' },
             { header: 'Event', accessor: 'type', className: 'font-semibold text-slate-700' },
@@ -263,6 +269,7 @@ export default function DashboardPage() {
         <DataTable
           title="Recent Withdraw Requests"
           data={recentWithdraws}
+          isLoading={chartsLoading}
           onRowClick={(item) => router.push(`/withdraw-requests/${item.id}`)}
           columns={[
             { header: 'User UID', accessor: 'user', className: 'truncate max-w-[120px]' },

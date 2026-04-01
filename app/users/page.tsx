@@ -52,30 +52,6 @@ export default function UsersPage() {
     return () => unsubscribe();
   }, [showToast]);
 
-  const handleToggleBan = async (id: string, currentStatus: string) => {
-    try {
-      const userRef = doc(db, 'users', id);
-      if (currentStatus === 'Banned') {
-        await updateDoc(userRef, {
-          bannedUntil: null,
-          bannedReason: null
-        });
-        showToast('User unbanned successfully', 'success');
-      } else {
-        const futureDate = new Date();
-        futureDate.setFullYear(futureDate.getFullYear() + 10);
-        await updateDoc(userRef, {
-          bannedUntil: futureDate.toISOString(),
-          bannedReason: 'Admin Action'
-        });
-        showToast('User banned', 'error');
-      }
-    } catch (error) {
-      console.error(error);
-      showToast('Failed to update ban status', 'error');
-    }
-  };
-
   // Reset page to 1 when search changes
   useEffect(() => {
     setCurrentPage(1);
@@ -108,16 +84,16 @@ export default function UsersPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Advanced Search Bar */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-           <div className="flex items-center gap-2 flex-1 w-full max-w-2xl">
-              <div className="relative">
+        <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full max-w-2xl">
+              <div className="relative w-full sm:w-auto">
                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
                     <Filter size={16} />
                  </div>
                  <select 
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value as any)}
-                    className="h-10 border border-slate-200 bg-slate-50 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 p-2.5 outline-none font-medium text-slate-700"
+                    className="h-10 border border-slate-200 bg-slate-50 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:min-w-[180px] pl-10 p-2.5 outline-none font-medium text-slate-700 appearance-none"
                  >
                     <option value="name">Search by Name</option>
                     <option value="email">Search by Email</option>
@@ -125,7 +101,7 @@ export default function UsersPage() {
                  </select>
               </div>
               
-              <div className="relative flex-1">
+              <div className="relative flex-1 w-full">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                   type="text" 
@@ -142,22 +118,10 @@ export default function UsersPage() {
                 </button>
               </div>
            </div>
-           
-           <button 
-             title="Export Options"
-             onClick={() => showToast('Export Options menu')}
-             className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 transition-all shrink-0"
-           >
-             <MoreVertical size={18} />
-           </button>
         </div>
 
-        {loading ? (
-          <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-          </div>
-        ) : (
-          <DataTable
+        <DataTable
+            isLoading={loading}
             data={paginatedUsers}
             compact={true}
             selectedId={selectedId || undefined}
@@ -209,24 +173,10 @@ export default function UsersPage() {
                   >
                     <Info size={14} />
                   </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleBan(item.id, item.status);
-                    }}
-                    title={item.status === 'Banned' ? 'Unban User' : 'Ban User'} 
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
-                      item.status === 'Banned' ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" : "bg-rose-50 text-rose-600 hover:bg-rose-100"
-                    )}
-                  >
-                    {item.status === 'Banned' ? <UserCheck size={14} /> : <Ban size={14} />}
-                  </button>
                 </div>
               )},
             ]}
           />
-        )}
       </div>
     </div>
   );

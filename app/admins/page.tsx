@@ -215,12 +215,8 @@ export default function AdminsPage() {
         </div>
       )}
 
-      {loading ? (
-        <div className="h-64 flex rounded-2xl border border-slate-200 bg-white items-center justify-center text-indigo-500">
-           <Loader2 size={32} className="animate-spin" />
-        </div>
-      ) : (
-        <DataTable 
+      <DataTable 
+          isLoading={loading}
           data={admins}
           title="Active Privileged Accounts"
           columns={[
@@ -256,7 +252,6 @@ export default function AdminsPage() {
             )}
           ]}
         />
-      )}
     </div>
   );
 }

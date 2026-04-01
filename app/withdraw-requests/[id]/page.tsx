@@ -7,6 +7,7 @@ import { useUI } from '@/context/UIContext';
 import { processWithdrawalAction } from '@/lib/firebase-transactions';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { SkeletonBlock } from '@/components/Skeleton';
 
 export default function WithdrawalDetailPage() {
   const params = useParams();
@@ -59,10 +60,14 @@ export default function WithdrawalDetailPage() {
 
   if (loading) {
      return (
-        <div className="flex h-[60vh] items-center justify-center">
-           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        </div>
-     )
+       <div className="space-y-6 animate-in fade-in pb-12">
+          <div className="h-8 w-64 bg-slate-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+             <SkeletonBlock />
+             <SkeletonBlock />
+          </div>
+       </div>
+     );
   }
 
   if (!request && !loading) {

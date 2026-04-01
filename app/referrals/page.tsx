@@ -124,14 +124,9 @@ export default function ReferralsPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {loading ? (
-           <div className="h-64 flex flex-col items-center justify-center text-indigo-500">
-             <Loader2 size={32} className="animate-spin mb-4" />
-             <p className="text-sm font-semibold animate-pulse text-slate-500">Assembling Relational Branch Mappings...</p>
-           </div>
-        ) : (
+      <div className="space-y-6">
            <DataTable
+             isLoading={loading}
              title="Recent Referral Origin Mapping"
              data={recentReferrals}
              onRowClick={(item) => router.push(`/users/${item.invitedUid}`)}
@@ -168,7 +163,6 @@ export default function ReferralsPage() {
                { header: 'Connection Date', accessor: 'date' },
              ]}
            />
-        )}
       </div>
     </div>
   );
